@@ -1,6 +1,6 @@
 # sap
 
-![sap header image](sap-800x400.png?raw=true)
+![sap header image](sap-800x200.png?raw=true)
 
 sap is a tool for *S*ynchronizing *A*rbitrary *P*ackages between
 two or more systems.

@@ -1,5 +1,7 @@
 # sap
 
+![sap header image](sap-800x400.png?raw=true)
+
 sap is a tool for *S*ynchronizing *A*rbitrary *P*ackages between
 two or more systems.
 
@@ -25,6 +27,6 @@ Project `bar` depends on libraries maintained in project `foo`'s git repository.
     * `sap save foo-libs`
     * If `foo-libs` is not installed, or an older version, this will pull the most recent `foo-libs` from your sap server and install them in `foo-libs/`.
 3. Add to your deployment pipeline. For example, in your Dockerfile:
-    * `RUN pip install sap && (cd /app/bar && sap install foo-libs)`
-    * This installs sap in your container and fetches the latest foo-libs package.
+    * `RUN pip install sap && (cd /app/bar && sap install)`
+    * This installs sap in your container and fetches any packages defined in the `sap.json` file.
 

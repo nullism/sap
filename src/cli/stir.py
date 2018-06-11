@@ -250,7 +250,7 @@ class Manifest():
     packages = []
 
     def __init__(self):
-        self.file = os.path.join(get_sap_dir(), "manifest.json")
+        self.file = os.path.join(get_stir_dir(), "manifest.json")
 
         if not os.path.exists(self.file):
             logger.info("creating manifest file")
@@ -383,7 +383,7 @@ class Target(Manager):
 
         self.server = Server("localhost", "8080")
         self.file = target_file
-        self.cache_dir = os.path.join(get_sap_dir(), "cache")
+        self.cache_dir = os.path.join(get_stir_dir(), "cache")
         self.manifest = Manifest()
         self.data = get_json_data(self.file)
         self.packages = [TargetPackage.from_data(
@@ -396,12 +396,12 @@ class Target(Manager):
                     exit_on_n=True)
             self.save()
 
-        if not os.path.exists(get_sap_dir()):
-            logger.info("making sap directory at %s", get_sap_dir())
-            os.mkdir(get_sap_dir())
+        if not os.path.exists(get_stir_dir()):
+            logger.info("making stir directory at %s", get_stir_dir())
+            os.mkdir(get_stir_dir())
 
         if not os.path.exists(self.cache_dir):
-            logger.info("making sap cache directory at %s", self.cache_dir)
+            logger.info("making stir cache directory at %s", self.cache_dir)
             os.mkdir(self.cache_dir)
 
     def savex(self):
@@ -585,8 +585,8 @@ def get_relpath(path):
     return path
 
 
-def get_sap_dir():
-    return os.path.join(os.path.expanduser("~"), ".sap")
+def get_stir_dir():
+    return os.path.join(os.path.expanduser("~"), ".stir")
 
 
 def get_date_string():
@@ -644,9 +644,9 @@ def get_yn(message, exit_on_n=False):
 def main():
     #print(find_files(path="../../", patterns=["*"]))
     root_dir = get_curdir()
-    default_server = os.environ.get("SAP_SERVER", "localhost")
-    default_source_path = os.path.join(root_dir, "sap-source.json")
-    default_target_path = os.path.join(root_dir, "sap.json")
+    default_server = os.environ.get("STIR_SERVER", "localhost")
+    default_source_path = os.path.join(root_dir, "stir-source.json")
+    default_target_path = os.path.join(root_dir, "stir.json")
     parser = argparse.ArgumentParser(description="Interact with libget")
     parser.add_argument(
         "-s", "--server", help="the server to use [env LIBGET_SERVER], default: %s" %
@@ -699,7 +699,7 @@ def main():
     for sub_cmd in [source_add, source_up, source_rm]:
         sub_cmd.add_argument(
             "-f", "--file", default=default_source_path,
-            help="the sap SOURCE file location, defaults to: %s" %
+            help="the stir SOURCE file location, defaults to: %s" %
             default_source_path)
 
     # Source add

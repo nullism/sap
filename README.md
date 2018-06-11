@@ -28,6 +28,6 @@ Project `bar` depends on libraries maintained in project `foo`'s git repository.
     * If `foo-libs` is not installed, or an older version, this will pull the most recent `foo-libs` from your sap server and install them in `foo-libs/`.
     * If `--save` is specified, this will write changes to a `sap.json` in the CWD (or elsewhere with `-f`).
 3. Add to your deployment pipeline. For example, in your Dockerfile:
-    * `RUN pip install sap && (cd /app/bar && sap install)`
-    * This installs sap in your container and fetches any packages defined in the `sap.json` file.
+    * `RUN pip install sap && (cd /app/bar && sap -y install)`
+    * This installs sap in your container and fetches any packages defined in the `sap.json` file. The `-y` is equivalent to Apt's `-y`.
 

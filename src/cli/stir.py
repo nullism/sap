@@ -10,7 +10,7 @@ import json
 import argparse
 import logging
 import utils
-#import raw_input
+# import raw_input
 
 logger = logging.getLogger("stir")
 logger.addHandler(logging.StreamHandler())
@@ -18,40 +18,9 @@ logger.setLevel(logging.INFO)
 
 DEFAULT_VERSION = "0.0.1"
 DEFAULT_PATTERNS = ["**"]
-
-
-class Version(object):
-    def __init__(self, version_string):
-        parts = version_string.split(".")
-        if len(parts) != 3:
-            raise Exception("Invalid version %s" % version_string)
-
-        self.major = int(parts[0])
-        self.minor = int(parts[1])
-        self.tiny = int(parts[2])
-
-    def __repr__(self):
-        return self.string
-
-    def __cmp__(self, other):
-        # allows comparing strings
-        if not isinstance(other, Version):
-            other = Version(other)
-
-        def normalize(v):
-            return [
-                int(x) for x in re.sub(r'(\.0+)*$', '', v).split(".")
-            ]
-        return cmp(normalize(self.string), normalize(other.string))
-
-    @property
-    def string(self):
-        return "%s.%s.%s" % (self.major, self.minor, self.tiny)
-
-    def increment(self, major=0, minor=0, tiny=0):
-        self.major += major
-        self.minor += minor
-        self.tiny += tiny
+SOURCE_NAME = "stir-define.json"
+TARGET_NAME = "stir-requirements.json"
+MANIFEST_NAME = "stir-installed.json"
 
 
 class Server():
@@ -74,74 +43,184 @@ class Server():
         return zpath
 
 
-def command_commit(args):
+def command_update(args):
 
-    if args.file:
-        args.file = utils.get_linux_path(args.file)
+    if args.recursive:
+        logger.info("finding all stir.json files")
+        file_datas = utils.get_stir_packages()
     else:
-        args.file = utils.get_linux_path(
-            os.path.join(utils.get_curdir(), "stir-source.json"))
+        file_path = utils.get_stir_file_path()
+        file_datas = [utils.json_load(file_path)]
+        file_datas[0]["stir_file"] = file_path
 
-    if not os.path.exists(args.file):
+    args.packages = [utils.clean_package_name(p) for p in args.packages]
+    if args.packages:
+        package_names = utils.get_valid_package_names(
+            args.packages, file_datas)
+    else:
+        package_names = None
+
+    for fdata in file_datas:
+        for package in fdata["packages"]:
+            if args.packages:
+                if package["name"] in package_names:
+                    update(package, fdata["stir_file"], args.no_increment)
+            else:
+                update(package, fdata["stir_file"], args.no_increment)
+
+
+def update(package, file_path, no_increment_version):
+
+    logger.info("updating %s from %s", package["name"], file_path)
+    source_dir = os.path.dirname(file_path)
+    logger.info("> finding files")
+    file_list = utils.find_files_chroot(
+        source_dir, package["patterns"], ["**stir.json"])
+    if len(file_list) < 1:
+        raise Exception("packages need at least 1 file")
+
+    package["files"] = file_list
+    package["last_update"] = int(time.time())
+
+    if not no_increment_version:
+        package["version"] = utils.increment_tiny(package["version"])
+        logger.info("> incremented version to %s", package["version"])
+
+    file_data = utils.json_load(file_path)
+    for pdata in file_data["packages"]:
+        if pdata["name"] == package["name"]:
+            file_data["packages"].remove(pdata)
+
+    file_data["packages"].append(package)
+
+    logger.info("> saving to %s", file_path)
+    utils.json_save(file_path, file_data)
+
+
+def command_upsert(args):
+
+    file_path = utils.get_stir_file_path()
+    if not os.path.exists(file_path):
         if not args.yes:
             utils.get_yn(
-                "stir-source.json not found, create it?", exit_on_n=True)
-        utils.json_save(args.file, {"packages": []})
+                "stir.json not found, create it?", exit_on_n=True)
+        utils.json_save(file_path, {"packages": []})
 
-    commit(
+    upsert(
         name=args.package,
-        path=args.path,
         patterns=args.patterns,
-        version=args.version,
-        file_path=args.file)
+        version=args.version)
 
 
-def commit(name, path, patterns=None, version=None, file_path=None):
+def upsert(name, patterns=None, version=None):
 
-    patterns = patterns or DEFAULT_PATTERNS
+    file_path = utils.get_stir_file_path()
+    source_dir = os.path.dirname(file_path)
+
+    defaults = {
+        "patterns": DEFAULT_PATTERNS,
+        "version": DEFAULT_VERSION,
+        "last_publish": None,
+    }
+
     name = utils.clean_package_name(name)
 
     logger.info("adding new package: %s", name)
 
-    file_list = utils.find_files_chroot(path, patterns)
+    file_data = utils.json_load(file_path)
+
+    for pdata in file_data["packages"]:
+        if pdata["name"] != name:
+            continue
+        defaults["version"] = utils.increment_tiny(pdata["version"])
+        defaults["last_publish"] = pdata["last_publish"]
+        file_data["packages"].remove(pdata)
+
+    file_list = utils.find_files_chroot(
+        source_dir, patterns or defaults["patterns"], ["**stir.json"])
+
     print(file_list)
 
     if len(file_list) < 1:
         raise Exception("packages must contain at least 1 file")
 
-    file_data = utils.json_load(file_path)
-
-    last_push = None
-    for pdata in file_data["packages"]:
-        if pdata["name"] != name:
-            continue
-        if not version:
-            v = Version(pdata["version"])
-            v.increment(tiny=1)
-            version = v.string
-        last_push = pdata["last_push"]
-        file_data["packages"].remove(pdata)
-
     package_data = {
         "name": name,
-        "version": version or DEFAULT_VERSION,
-        "patterns": patterns,
+        "version": version or defaults["version"],
+        "patterns": patterns or defaults["patterns"],
         "files": file_list,
-        "last_push": last_push,
-        "last_modified": int(time.time()),
+        "last_publish": defaults["last_publish"],
+        "last_update": int(time.time()),
     }
 
     file_data["packages"].append(package_data)
     utils.json_save(file_path, file_data)
+    logger.info("> saved %s (%s)", name, package_data["version"])
+    logger.debug(
+        "> saved package as:\n%s", json.dumps(package_data, indent=2))
 
 
 def command_pull(args):
     pass
 
 
-def command_push(args):
-    pass
+def command_publish(args):
 
+    if args.recursive:
+        logger.info("finding all stir.json files")
+        file_datas = utils.get_stir_packages()
+    else:
+        file_path = utils.get_stir_file_path()
+        file_datas = [utils.json_load(file_path)]
+        file_datas[0]["stir_file"] = file_path
+
+    args.packages = [utils.clean_package_name(p) for p in args.packages]
+    if args.packages:
+        package_names = utils.get_valid_package_names(
+            args.packages, file_datas)
+    else:
+        package_names = None
+
+    for fdata in file_datas:
+        for package in fdata["packages"]:
+            if args.packages:
+                if package["name"] in package_names:
+                    publish(package, fdata["stir_file"])
+            else:
+                publish(package, fdata["stir_file"])
+
+
+def publish(package, file_path):
+
+    logger.info(
+        "publishing package %s-%s", package["name"], package["version"])
+
+    package_dir = os.path.dirname(file_path)
+
+    if package["last_publish"] and \
+            package["last_publish"] >= package["last_update"]:
+        logger.info(
+            "> package has not been updated since it was last published")
+        return
+
+    file_data = utils.json_load(file_path)
+
+    for pdata in file_data["packages"]:
+        if pdata["name"] == package["name"]:
+            pdata["last_publish"] = int(time.time())
+            package = pdata
+            break
+
+    zip_name = "%s-%s.zip" % (package["name"], package["version"])
+    zip_path = os.path.join(package_dir, zip_name)
+    logger.debug("> creating temporary zip: %s", zip_path)
+
+    utils.zipfile_create_chroot(package_dir, zip_path, package["files"])
+
+    logger.info("> pushing:\n%s", json.dumps(package, indent=2))
+
+    logger.info("> saving to %s", file_path)
+    utils.json_save(file_path, file_data)
 
 def command_remove(args):
     pass
@@ -153,11 +232,12 @@ def cmp(a, b):
 
 
 def main():
-    #print(find_files(path="../../", patterns=["*"]))
+    # print(find_files(path="../../", patterns=["*"]))
     default_server = os.environ.get("STIR_SERVER", "localhost")
-    parser = argparse.ArgumentParser(description="Interact with libget")
+    parser = argparse.ArgumentParser(description="interact with stir packages")
     parser.add_argument(
-        "-s", "--server", help="the server to use [env LIBGET_SERVER], default: %s" %
+        "-s", "--server",
+        help="the server to use [env LIBGET_SERVER], default: %s" %
         default_server, default=default_server)
     parser.add_argument(
         "-y", "--yes", action="store_true",
@@ -168,15 +248,44 @@ def main():
 
     subparsers = parser.add_subparsers()
 
-    # Source
-    commit = subparsers.add_parser("commit", help="commit a package")
-    commit.add_argument("package", help="package name to add")
-    commit.add_argument("path", help="path to package relative to FILE dir")
-    commit.add_argument("-p", "--patterns",
+    upsert = subparsers.add_parser(
+        "upsert", help="add or update a package")
+    upsert.add_argument("package", help="package name to add or update")
+    upsert.add_argument("-p", "--patterns",
                         help="patterns, use '**' for recursion", nargs="*")
-    commit.add_argument("-f", "--file", help="path to stir-source file")
-    commit.add_argument("-v", "--version", help="manually specify a version")
-    commit.set_defaults(func=command_commit)
+    upsert.add_argument("-v", "--version", help="manually specify a version")
+    upsert.set_defaults(func=command_upsert)
+
+    update = subparsers.add_parser("update", help="updates source packages")
+    update.add_argument("packages", help="packages to update", nargs="*")
+    update.add_argument(
+        "-r", "--recursive", action="store_true",
+        help="recursively search for packages to update")
+    update.add_argument("-n", "--no-increment", action="store_true",
+                        help="do not increment version numbers")
+    update.set_defaults(func=command_update)
+
+    # Pull
+    install = subparsers.add_parser("install", help="install a package")
+
+    # Uninstall
+    uninstall = subparsers.add_parser("uninstall", help="uninstall a package")
+
+    # Push
+    publish = subparsers.add_parser(
+        "publish", help="push packages to the server")
+    publish.add_argument(
+        "packages",
+        help="package(s) to publish. publish all packages if blank.",
+        nargs="*")
+    publish.add_argument(
+        "-r", "--recursive", action="store_true",
+        help="recursivly look for packages to publish")
+    publish.set_defaults(func=command_publish)
+
+    # Remove
+    unpublish = subparsers.add_parser(
+        "unpublish", help="remove a package from the server")
 
     args = parser.parse_args()
     if args.verbose:

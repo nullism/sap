@@ -20,14 +20,12 @@ or any other files.
 
 Project `bar` depends on libraries maintained in project `foo`'s git repository.
 
-1. From `foo`'s git repository, create your package.
-    * `stir source add foo-libs libs/ -p "**.py"`
-    * This will find all files in `libs/` that match `**.py` (`**` is the convention for recursive matching) and uploads them in a package file called `foo-libs-0.0.1.zip` on your stir server.
-2. When working in the `bar` project, fetch the latest `foo-libs` package.
-    * `stir install foo-libs`
-    * If `foo-libs` is not installed, or an older version, this will pull the most recent `foo-libs` from your stir server and install them in `foo-libs/`.
-    * If `--save` is specified, this will write changes to a `stir.json` in the CWD (or elsewhere with `-f`).
-3. Add to your deployment pipeline. For example, in your Dockerfile:
-    * `RUN pip install stir && (cd /app/bar && stir -y install)`
-    * This installs stir in your container and fetches any packages defined in the `stir.json` file. The `-y` is equivalent to Apt's `-y`.
-
+1. From `foo`'s git repository, in a directory that will be the package root, create your package.
+    * `stir upsert foolibs -p "**.py"`
+    * This will find all files in the current that match `**.py` (`**` is the convention for recursive matching).
+2. From `foo`'s git repository, run `stir publish foolibs`. This will bundle the package (`foolibs-0.0.1.zip`) and push it to the server.
+3. When working in the `bar` project, fetch the latest `foolibs` package.
+    * `stir install foolibs`
+    * If `foolibs` is not installed, or an older version, this will pull the most recent `foolibs` package from your stir server and install it in `foolibs/`.
+4. Add to your deployment pipeline. For example, in your Dockerfile:
+    * `RUN pip install stir && (cd /app/bar && stir -y install foolibs)`

@@ -1,0 +1,5 @@
+**.vscode
+libs
+
+# Python files
+**/__pycache__

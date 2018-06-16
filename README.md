@@ -2,8 +2,7 @@
 
 ![stir header image](stir-800x200.png?raw=true)
 
-stir is a tool for *S*ynchronizing *A*rbitrary *P*ackages between
-two or more systems.
+stir is a tool for synchronizing files between two or more systems &mdash; a general purpose package manager.
 
 stir is a simple method of sharing source code libraries between microservices,
 fetching credential files (like Google's service account `credentials.json`),
@@ -13,6 +12,16 @@ or any other files.
 
 1. A package containing some files is created and placed on your private server.
 2. The package is then installed via `stir install package-name` wherever the files are needed.
+
+## Features
+
+* **Merging** - Multiple packages can be installed in the same directory.
+* **Easy** - Creating and publishing packages is trivial.
+* **Language Agnostic** - Python, JavaScript, C source, or any file type you need to package and share.
+* **Secure** - Packages can require authentication to update or fetch.
+* **Private** - Host your own stir server.
+* **Microservices** - No need to duplicate code between services.
+
 
 ## Examples
 

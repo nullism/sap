@@ -1,8 +1,15 @@
 #!/usr/bin/env python
-import os
-import base64
-import utils
 
+import base64
+import os
+import sys
+
+# python import foo
+local_dir = os.path.realpath(
+    os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, local_dir)
+
+import stir.utils as utils
 
 
 if __name__ == "__main__":

@@ -1,9 +1,16 @@
+import base64
 import os
 import json
 import logging
 import re
 import sys
 import zipfile
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.backends.openssl.rsa import _RSAPrivateKey, _RSAPublicKey
+from cryptography.hazmat.backends.openssl.dsa import _DSAPrivateKey, _DSAPublicKey
 
 logger = logging.getLogger("stir")
 
@@ -45,6 +52,7 @@ class Version(object):
 def cmp(a, b):
     """ trick to get python3 working with cmp """
     return (a > b) - (a < b)
+
 
 def clean_package_name(name):
     return name.strip().lower().replace(" ", "-")
@@ -145,11 +153,13 @@ def get_source_file_path(file_path):
 
     return get_linux_path(file_path)
 
+
 def get_stir_file_path(root_dir=None):
 
     if not root_dir:
         root_dir = get_curdir()
     return os.path.join(root_dir, "stir.json")
+
 
 def get_stir_packages(root_dir=None):
 
@@ -165,6 +175,7 @@ def get_stir_packages(root_dir=None):
 
     return packages
 
+
 def get_valid_package_names(package_names, file_data_list):
     package_names = [clean_package_name(p) for p in package_names]
     pnames = []
@@ -177,6 +188,7 @@ def get_valid_package_names(package_names, file_data_list):
         raise Exception("could not find packages: %s" % not_found)
     return pnames
 
+
 def get_yn(message, exit_on_n=False):
     message = "%s [Y/n]" % message
     yn = get_input(message, default="n").lower()
@@ -186,10 +198,12 @@ def get_yn(message, exit_on_n=False):
         sys.exit()
     return False
 
+
 def increment_tiny(version_string, amount=1):
     vo = Version(version_string)
     vo.increment(tiny=1)
     return vo.string
+
 
 def json_load(path):
     with open(path, "r") as fh:
@@ -200,12 +214,85 @@ def json_save(path, data):
     with open(path, "w") as fh:
         json.dump(data, fh, indent=2)
 
+
+def load_private_key(path, password=None):
+
+    with open(path, "rb") as fh:
+        private_key = serialization.load_pem_private_key(
+            fh.read(),
+            password=password,
+            backend=default_backend()
+        )
+        return private_key
+
+
+def load_public_key(path):
+
+    with open(path, "rb") as fh:
+        public_key = serialization.load_ssh_public_key(
+            fh.read(),
+            backend=default_backend()
+        )
+        return public_key
+
+
+def sign_message(message, private_key):
+
+    if not isinstance(message, bytes):
+        message = bytes(message.encode("utf-8"))
+
+    if isinstance(private_key, _DSAPrivateKey):
+        sig = private_key.sign(
+            message,
+            hashes.SHA256()
+        )
+    elif isinstance(private_key, _RSAPrivateKey):
+        sig = private_key.sign(
+            message,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+    else:
+        raise Exception("Unsupported private key, must be RSA or DSA")
+
+    return sig
+
+
+def verify_message(message, signature, public_key):
+
+    if not isinstance(message, bytes):
+        message = bytes(message.encode("utf-8"))
+
+    if isinstance(public_key, _DSAPublicKey):
+        public_key.verify(
+            signature,
+            message,
+            hashes.SHA256()
+        )
+    elif isinstance(public_key, _RSAPublicKey):
+        public_key.verify(
+            signature,
+            message,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+    else:
+        raise Exception("Unsupported public key, must be DSA or RSA")
+
+
 def zipfile_create_chroot(chdir, output_path, file_paths):
 
     curdir = get_curdir()
     os.chdir(chdir)
     zipfile_create(output_path, file_paths)
     os.chdir(curdir)
+
 
 def zipfile_create(output_path, file_paths):
     # Exclude stir.json

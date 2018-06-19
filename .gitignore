@@ -3,3 +3,6 @@ libs
 
 # Python files
 **/__pycache__
+**.pyc
+dist
+**.egg-info

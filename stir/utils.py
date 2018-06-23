@@ -73,13 +73,13 @@ def find_files(path, patterns, excludes=[]):
 
     for pat in patterns:
         pat_e = re.escape(get_relpath(get_linux_path(pat)))
-        pat_e = pat_e.replace("\*\*", rec_re).replace("\*", star_re) + "$"
+        pat_e = pat_e.replace(r"\*\*", rec_re).replace(r"\*", star_re) + "$"
         cmp_re = re.compile(pat_e)
         re_pats.append(cmp_re)
 
     for pat in excludes:
         pat_e = re.escape(get_relpath(get_linux_path(pat)))
-        pat_e = pat_e.replace("\*\*", rec_re).replace("\*", star_re) + "$"
+        pat_e = pat_e.replace(r"\*\*", rec_re).replace(r"\*", star_re) + "$"
         cmp_re = re.compile(pat_e)
         re_excs.append(cmp_re)
 

@@ -1,3 +1,4 @@
+import hashlib
 import sys
 from sqlalchemy import (
     Column, UniqueConstraint, ForeignKey, Float,
@@ -5,7 +6,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.types import Boolean, Enum
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, sessionmaker, scoped_session, backref
+
 
 BASE = declarative_base()
 DB_PATH = "./testdb.db"
@@ -45,9 +48,21 @@ class User(BASE):
     __tablename__ = "user"
     id = Column(Integer, primary_key=True, autoincrement=True)
     email = Column(String(50), unique=True)
-    password = Column(String(100))
+    _password = Column("password", String(100))
     is_root = Column(Boolean, default=False)
 
+    @classmethod
+    def hash_password(self, password):
+        pws = "%sACCX2PTFKM6" % password # TODO make salt configurable
+        return hashlib.sha256(pws.encode("utf-8")).hexdigest()
+
+    @hybrid_property
+    def password(self):
+        return self._password
+
+    @password.setter
+    def password(self, value):
+        self._password = User.hash_password(value)
 
 class UserOrg(BASE):
 
@@ -60,3 +75,7 @@ class UserOrg(BASE):
 if __name__ == "__main__":
 
     BASE.metadata.create_all(ENGINE)
+
+    u1 = User(email="foo@bar.com", password="abc123", is_root=True)
+    DB.add(u1) # pylint: disable=E1101
+    DB.commit() # pylint: disable=E1101
